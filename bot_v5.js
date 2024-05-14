@@ -23,10 +23,17 @@ const keyboardMarkup = {
   },
 };
 
+// Helper function to ensure session exists
+function ensureSession(ctx) {
+  if (!sessions[ctx.from.id]) {
+    sessions[ctx.from.id] = { searchType: "player" }; // Set default search type as player
+  }
+}
+
 // Start command handler
 bot.command("start", (ctx) => {
   // Set default search type as player
-  sessions[ctx.from.id] = { searchType: "player" };
+  ensureSession(ctx);
   ctx.reply(
     "Welcome to the Clash of Clans bot! Use the buttons below to search for players or clans.",
     keyboardMarkup
@@ -35,24 +42,28 @@ bot.command("start", (ctx) => {
 
 // Handler for inline keyboard buttons
 bot.action("searchPlayer", (ctx) => {
-  sessions[ctx.from.id] = { searchType: "player" };
+  ensureSession(ctx);
+  sessions[ctx.from.id].searchType = "player";
   ctx.reply("Please enter the player tag:");
 });
 
 bot.action("searchClan", (ctx) => {
-  sessions[ctx.from.id] = { searchType: "clan" };
+  ensureSession(ctx);
+  sessions[ctx.from.id].searchType = "clan";
   ctx.reply("Please enter the clan tag:");
 });
 
 // Command handler for /player
 bot.command("player", (ctx) => {
-  sessions[ctx.from.id] = { searchType: "player" };
+  ensureSession(ctx);
+  sessions[ctx.from.id].searchType = "player";
   ctx.reply("Please enter the player tag:");
 });
 
 // Command handler for /clan
 bot.command("clan", (ctx) => {
-  sessions[ctx.from.id] = { searchType: "clan" };
+  ensureSession(ctx);
+  sessions[ctx.from.id].searchType = "clan";
   ctx.reply("Please enter the clan tag:");
 });
 
@@ -84,10 +95,10 @@ bot.on("text", async (ctx) => {
 
     const { data } = response;
 
-    console.log("🚀 ~ bot.on ~ data:", data);
-
     // Store the response data in the session object
     sessions.response = data;
+
+    console.log("🚀 ~ bot.on ~ data:", data);
 
     // Format the data to only include the first 20 entries
     const slicedData = JSON.stringify(
@@ -96,7 +107,7 @@ bot.on("text", async (ctx) => {
 
     // Write clan and member data to CSV
     if (session.searchType === "clan" && data.hasOwnProperty("memberList")) {
-      writeClanMembersToCSV(JSON.stringify(data.memberList));
+      writeClanMembersToCSV(data);
     } else {
       writeToCSV(
         `${session.searchType},${query},${slicedData}`,
@@ -162,7 +173,21 @@ bot.on("text", async (ctx) => {
       }\n👑Heroes: ${heroLevels}`;
     } else if (session.searchType === "clan") {
       // Format clan data
-      message = `Clan Name 🎪: ${data.name}\nClan Tag 🏷️: ${data.tag}\nClan Level 📶: ${data.clanLevel}\nBadge URL: ${data.badgeUrls.large}\nClan type: ${data.type}\nRequired trophies 🏆: ${data.requiredTrophies}\nClan location 🌎: ${data.location.name}\nChat language 🌐: ${data.chatLanguage.name}\nClan war wins: ${data.warWins}\nClan war win streak: ${data.warWinStreak}\nClan war league: ${data.warLeague.name}\nClan war frequency: ${data.warFrequency}\nClan members count: ${data.members}\nClan Capital Hall level 🏘️: ${data.clanCapital.capitalHallLevel}`;
+      message = `Clan Name 🎪: ${data.name}\nClan Tag 🏷️: ${
+        data.tag
+      }\nClan Level 📶: ${data.clanLevel}\nBadge URL: ${
+        data.badgeUrls.large
+      }\nClan type: ${data.type}\nRequired trophies 🏆: ${
+        data.requiredTrophies
+      }\nClan location 🌎: ${data.location.name}\nChat language 🌐: ${
+        data.hasOwnProperty("chatLanguage") ? data.chatLanguage.name : "Not set"
+      }\nClan war wins: ${data.warWins}\nClan war win streak: ${
+        data.warWinStreak
+      }\nClan war league: ${data.warLeague.name}\nClan war frequency: ${
+        data.warFrequency
+      }\nClan members count: ${data.members}\nClan Capital Hall level 🏘️: ${
+        data.clanCapital.capitalHallLevel
+      }`;
     }
 
     const tagWithoutPound = data.tag.replace("#", "");
@@ -303,6 +328,8 @@ function writeToCSV(data, fileName) {
   const formattedRows = rows.join("\n"); // Join the selected rows back into a single string
   const row = `${timestamp},${formattedRows}\n`;
 
+  console.log("writeToCsv is running...");
+
   fs.appendFile(fileName, row, { encoding: "utf-8" }, (err) => {
     if (err) {
       console.error("Error writing to CSV file:", err);
@@ -310,6 +337,7 @@ function writeToCSV(data, fileName) {
   });
 }
 
+// Function to write clan members data to a CSV file
 function writeClanMembersToCSV(clanData) {
   // Extract clan members data
   const clanMembers = clanData.memberList;
@@ -317,7 +345,7 @@ function writeClanMembersToCSV(clanData) {
   const timestamp = moment().format("YYYY-MM-DD HH:mm:ss");
 
   // Prepare CSV content
-  let csvContent = `"${timestamp}","Clan Name: ${clanData.name}","Clan tag: ${clanData.tag}", "Clan level: ${clanData.ClanLevel}"\n`; // Add timestamp and clan name as the first row
+  let csvContent = `"${timestamp}","Clan Name: ${clanData.name}","Clan tag: ${clanData.tag}", "Clan level: ${clanData.clanLevel}"\n`; // Add timestamp and clan name as the first row
   csvContent +=
     "Player Tag,Player Name,Town Hall Level,Experience Level,Trophies,Role\n"; // CSV header
 
@@ -341,6 +369,7 @@ function writeClanMembersToCSV(clanData) {
     }
   );
 }
+
 // Start the bot
 console.log("Bot is running...");
 
